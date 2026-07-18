@@ -1,0 +1,13 @@
+# Dependensi untuk Art-Net → Roblox DMX Bridge
+# Install dengan perintah: pip install -r requirements.txt
+
+# Server HTTP/WebSocket async (server.py)
+aiohttp>=3.9.0
+
+# Client WebSocket async (artnet2WSS.py)
+websockets>=12.0
+
+# tkinter sudah termasuk dalam instalasi Python standar (Windows/macOS)
+# Jika menggunakan Linux dan tkinter tidak tersedia, jalankan:
+#   sudo apt install python3-tk   (Debian/Ubuntu)
+#   sudo dnf install python3-tkinter   (Fedora)
