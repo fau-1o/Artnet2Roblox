@@ -1,6 +1,6 @@
 # 🎛️ DMX Art-Net → Roblox Bridge
 
-Proyek ini memungkinkan kamu mengontrol lighting/DMX di dalam game Roblox secara real-time menggunakan sinyal Art-Net dari software DMX seperti MA3, QLC+, atau sejenisnya.
+Proyek ini memungkinkan kamu mengontrol lighting/DMX di dalam game Roblox secara real-time menggunakan sinyal Art-Net dari software DMX seperti MA3, QLC+, MagicQ atau sejenisnya.
 
 ---
 
@@ -8,7 +8,7 @@ Proyek ini memungkinkan kamu mengontrol lighting/DMX di dalam game Roblox secara
 
 ### Risiko Penggunaan Executor Roblox
 
-Script Roblox (`Roblox_Script.lua`) dijalankan menggunakan **executor** (seperti Synapse X, KRNL, Delta, dll). Penggunaan executor memiliki risiko nyata:
+Script Roblox (`Roblox_Script.lua`) dijalankan menggunakan **executor** (seperti Synapse X, KRNL, Delta, Xeno dll). Penggunaan executor memiliki risiko nyata:
 
 - 🚫 **Melanggar Syarat & Ketentuan Roblox (ToS)** — akunmu bisa **dibanned permanen** tanpa peringatan.
 - 🔒 **Risiko keamanan** — executor pihak ketiga bisa berisi malware atau mencuri data akunmu.
