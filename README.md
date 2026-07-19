@@ -30,11 +30,10 @@ Script Roblox (`Roblox_Script.lua`) dijalankan menggunakan **executor** (seperti
 
 ## 🎮 Game yang Didukung
 
-| Game | Developer | Status |
-|------|-----------|--------|
-| [Clarity Over Resonance](https://www.roblox.com/search/universal?q=Clarity+Over+Resonance) | Beyond Clarity Studio | ✅ Didukung |
+| Game | Studio | Status |
+|------|--------|--------|
+| [Clarity Over Resonance](https://www.roblox.com/games/18218605381/Clarity-Over-Resonance) | Beyond Clarity Studio | ✅ Didukung |
 
-> Ingin menambahkan game lain? Pastikan game tersebut memiliki sistem kendaraan dengan `RemoteEvent` bernama `Data` di dalam folder `Vehicles` pada workspace-nya.
 
 ---
 
