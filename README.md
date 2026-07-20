@@ -16,6 +16,10 @@ Script Roblox (`Roblox_Script.lua`) dijalankan menggunakan **executor** (seperti
 
 > **🔴 SANGAT DIREKOMENDASIKAN: Gunakan akun Roblox alternatif (bukan akun utama) saat menggunakan executor ini. Jangan pernah memasukkan password akun utamamu di PC yang sama dengan executor.**
 
+> **⚠️ DISCLAIMER: Kami TIDAK merekomendasikan penggunaan executor.** Proyek ini dibagikan apa adanya (as-is) untuk keperluan eksperimen pribadi. Segala risiko — termasuk kemungkinan **akun Roblox-mu terkena banned/suspend** — sepenuhnya menjadi tanggung jawab pengguna sendiri. **Kami tidak bertanggung jawab dan tidak bisa membantu memulihkan akun** yang terkena banned akibat penggunaan executor ini.
+>
+> 🛠️ Saat ini sedang dikembangkan **metode alternatif tanpa executor** (misalnya melalui plugin/API resmi) agar lebih aman dan sesuai ToS Roblox. Namun metode tersebut **masih dalam tahap pengembangan** dan belum tersedia. Pantau terus repo ini untuk update-nya.
+
 ---
 
 ## 📁 Deskripsi File
