@@ -14,13 +14,14 @@ Sinyal Art-Net dari console/software DMX-mu akan diteruskan lewat bridge ini men
 4. [🎮 Game yang Didukung](#-game-yang-didukung)
 5. [🖥️ Persyaratan Sistem](#️-persyaratan-sistem)
 6. [⚙️ Instalasi](#️-instalasi)
-7. [🚀 Cara Menjalankan](#-cara-menjalankan-1-server-per-server-roblox)
-8. [🌐 Multiplayer Lewat Internet (Cloudflare Tunnel)](#-mengizinkan-player-lain-bergabung-beda-internetlokasi)
-9. [🔄 Menghentikan Script di Roblox](#-menghentikan-script-di-roblox)
-10. [🔌 Referensi Endpoint Server](#-referensi-endpoint-server)
-11. [❓ Troubleshooting](#-troubleshooting)
-12. [📝 Catatan Tambahan](#-catatan-tambahan)
-13. [📄 Lisensi](#-lisensi)
+7. [🖱️ Cara Pakai File .bat (Windows, Sekali Klik)](#️-cara-pakai-file-bat-windows-sekali-klik)
+8. [🚀 Cara Menjalankan](#-cara-menjalankan-1-server-per-server-roblox)
+9. [🌐 Multiplayer Lewat Internet (Cloudflare Tunnel)](#-mengizinkan-player-lain-bergabung-beda-internetlokasi)
+10. [🔄 Menghentikan Script di Roblox](#-menghentikan-script-di-roblox)
+11. [🔌 Referensi Endpoint Server](#-referensi-endpoint-server)
+12. [❓ Troubleshooting](#-troubleshooting)
+13. [📝 Catatan Tambahan](#-catatan-tambahan)
+14. [📄 Lisensi](#-lisensi)
 
 ---
 
@@ -83,6 +84,10 @@ Polling mengambil banyak frame sekaligus dari server (batch), lalu frame-frame i
 | 🌐 `server.py` | Python (aiohttp, async) | Server lokal yang menampung data DMX dari satu atau banyak client (`artnet2WSS.py`), menyediakan endpoint HTTP/WebSocket untuk diambil oleh script Roblox. |
 | 🎮 `Roblox_Script.lua` | Lua (Roblox executor) | Berjalan di dalam game [Clarity Over Resonance](https://www.roblox.com/games/18218605381/Clarity-Over-Resonance) — polling data dari `server.py`, lalu meneruskannya ke sistem lighting/kendaraan di dalam game sesuai username. |
 | 📦 `requirements.txt` | — | Daftar dependensi Python yang dibutuhkan (`aiohttp`, `websockets`). |
+| 🖱️ `1_INSTALL_DEPENDENSI.bat` | Windows Batch | Sekali klik untuk install semua library Python yang dibutuhkan (pengganti `pip install -r requirements.txt`). |
+| 🖱️ `2_JALANKAN_SERVER.bat` | Windows Batch | Sekali klik untuk menjalankan `server.py` tanpa perlu buka Command Prompt manual. |
+| 🖱️ `3_JALANKAN_ARTNET2WSS.bat` | Windows Batch | Sekali klik untuk menjalankan `artnet2WSS.py` tanpa perlu buka Command Prompt manual. |
+| 🖱️ `START_SEMUA.bat` | Windows Batch | Sekali klik: install dependensi (jika belum) **dan** langsung menjalankan `server.py` + `artnet2WSS.py` bersamaan di dua jendela terpisah — cara tercepat untuk mulai main. |
 
 ---
 
@@ -132,6 +137,28 @@ Ini akan menginstall:
 > sudo dnf install python3-tkinter  # Fedora
 > ```
 
+> 💡 **Pengguna Windows:** tidak perlu buka Command Prompt manual. Tinggal **double-click `1_INSTALL_DEPENDENSI.bat`** — sekali klik, semua library otomatis terinstall. Lihat bagian [🖱️ Cara Pakai File .bat (Windows, Sekali Klik)](#️-cara-pakai-file-bat-windows-sekali-klik) di bawah.
+
+---
+
+## 🖱️ Cara Pakai File `.bat` (Windows, Sekali Klik)
+
+Untuk pengguna Windows yang tidak ingin repot mengetik perintah di Command Prompt, project ini sudah menyediakan 4 file `.bat` siap pakai — tinggal **double-click**, tanpa perlu ketik apa pun:
+
+| File | Kapan dipakai |
+|------|---------------|
+| `1_INSTALL_DEPENDENSI.bat` | Jalankan **sekali saja** di awal (atau setiap ada update library) untuk install semua dependensi Python secara otomatis |
+| `2_JALANKAN_SERVER.bat` | Pengganti `python server.py` — double-click untuk menyalakan server |
+| `3_JALANKAN_ARTNET2WSS.bat` | Pengganti `python artnet2WSS.py` — double-click untuk membuka GUI Art-Net |
+| `START_SEMUA.bat` | **Paling praktis.** Sekali klik: otomatis cek & install dependensi (jika belum), lalu langsung membuka `server.py` dan `artnet2WSS.py` bersamaan di dua jendela terpisah |
+
+**Rekomendasi pemakaian tercepat:**
+1. Double-click `START_SEMUA.bat`
+2. Tunggu sampai dua jendela Command Prompt terbuka (Server + GUI Art-Net)
+3. Isi Username di jendela GUI, lalu lanjut ke [Langkah 3 — Buka Roblox & Jalankan Script Executor](#langkah-3--buka-roblox--jalankan-script-executor-) di bawah
+
+> Semua file `.bat` otomatis mendeteksi apakah Python di sistemmu terdaftar sebagai `python` atau `py`, jadi tetap berfungsi meski cara instalasi Python-nya berbeda-beda. File `.bat` ini **hanya untuk Windows** — pengguna macOS/Linux tetap menjalankan lewat perintah `python3 server.py` dll seperti biasa.
+
 ---
 
 ## 🚀 Cara Menjalankan (1 Server per Server Roblox)
@@ -162,6 +189,8 @@ Art-Net Bridge Server — READY
 
 📌 Biarkan jendela ini **tetap terbuka** selama bermain.
 
+> 🖱️ **Windows:** cukup double-click `2_JALANKAN_SERVER.bat` sebagai gantinya.
+
 ### Langkah 2 — Jalankan `artnet2WSS.py` 🖼️
 
 Buka Command Prompt **baru** (jangan tutup yang pertama), lalu:
@@ -181,6 +210,8 @@ Aplikasi GUI akan terbuka dan memintamu memasukkan **username** — ini digunaka
 Jika koneksi ke server berhasil, indikator **🟢 "WebSocket connected"** akan menyala hijau. Saat paket Art-Net mulai diterima, indikator **🔵 "Art-Net detected"** juga akan menyala.
 
 > 💡 Klik menu **File → Show Output** untuk membuka jendela yang menampilkan nilai real-time seluruh 512 channel DMX.
+
+> 🖱️ **Windows:** cukup double-click `3_JALANKAN_ARTNET2WSS.bat` sebagai gantinya.
 
 ### Langkah 3 — Buka Roblox & Jalankan Script Executor 🎮
 
@@ -293,6 +324,9 @@ Script akan mendeteksi flag ini pada iterasi polling berikutnya, mencetak log `[
 
 **🔴 Cloudflare tunnel tidak bisa terhubung**
 → Pastikan menggunakan `wss://` (bukan `ws://`) saat menggunakan URL Cloudflare. Ingat, URL tunnel berubah setiap kali `cloudflared` di-restart.
+
+**🔴 `artnet2WSS.py` error `'ProactorEventLoop' object has no attribute 'sock_recvfrom'`**
+→ Ini bug kompatibilitas asyncio di Windows (event loop default `ProactorEventLoop` baru mendukung `sock_recvfrom` mulai Python 3.11). Sudah diperbaiki di `artnet2WSS.py` versi ini dengan memaksa pemakaian `SelectorEventLoop` khusus di Windows. Jika masih muncul, pastikan kamu memakai file `artnet2WSS.py` versi terbaru dari repo ini.
 
 **🔴 Script executor langsung error / crash**
 → Pastikan executormu mendukung fungsi `http_request`/`request`. Tidak semua executor gratis mendukung fitur ini — script akan menampilkan error `"Executor tidak mendukung HTTP request"` jika tidak didukung.
