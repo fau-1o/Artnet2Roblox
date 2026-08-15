@@ -27,25 +27,25 @@ Sinyal Art-Net dari console/software DMX-mu akan diteruskan lewat bridge ini men
 
 ## ⚠️ PERINGATAN PENTING — BACA SEBELUM MULAI
 
-### 🎯 Risiko Penggunaan Executor Roblox
+### 🎯 Cara Menjalankan Script Lua di Roblox
 
-Script Roblox (`Roblox_Script.lua`) dijalankan menggunakan **executor** (seperti Synapse X, KRNL, Delta, Xeno, dll). Penggunaan executor memiliki risiko nyata yang perlu kamu pahami:
+Script Roblox (`Roblox_Script.lua`) saat ini dijalankan menggunakan **script runner/plugin pihak ketiga** untuk Roblox. Metode ini memiliki beberapa hal yang perlu kamu pahami:
 
-| Risiko | Penjelasan |
+| Hal Penting | Penjelasan |
 |--------|------------|
-| 🚫 **Pelanggaran ToS Roblox** | Executor melanggar Syarat & Ketentuan Roblox — akunmu bisa **dibanned/disuspend permanen** tanpa peringatan. |
-| 🔒 **Risiko keamanan** | Executor pihak ketiga (terutama versi gratis/bajakan) bisa berisi malware atau mencuri data akun & informasi pribadimu. |
-| 👁️ **Tidak ada jaminan aman** | Roblox secara aktif mengembangkan sistem deteksi anti-cheat/anti-executor. Tidak ada executor yang 100% "aman" selamanya. |
+| 🚫 **Bukan metode resmi** | Menjalankan script lewat tool pihak ketiga berada di luar cara resmi yang didukung Roblox — akunmu berisiko **dibanned/disuspend** tanpa peringatan. |
+| 🔒 **Risiko keamanan** | Tool pihak ketiga (terutama versi gratis/tidak resmi) bisa berisi malware atau mencuri data akun & informasi pribadimu. Selalu unduh dari sumber yang kamu percaya. |
+| 👁️ **Tidak ada jaminan aman** | Roblox secara aktif mengembangkan sistem deteksi untuk aktivitas semacam ini. Tidak ada tool yang 100% "aman" selamanya. |
 
-> **🔴 SANGAT DIREKOMENDASIKAN:** Gunakan **akun Roblox alternatif** (bukan akun utama) saat menggunakan executor ini. **Jangan pernah** login akun utamamu di PC yang sama dengan executor.
+> **🔴 SANGAT DIREKOMENDASIKAN:** Gunakan **akun Roblox alternatif** (bukan akun utama) saat mencoba proyek ini. **Jangan pernah** login akun utamamu di PC yang sama dengan tool pihak ketiga tersebut.
 
 > **⚠️ DISCLAIMER RESMI**
 >
-> **Kami TIDAK merekomendasikan penggunaan executor.** Proyek ini dibagikan apa adanya (*as-is*) untuk keperluan eksperimen/pribadi. Dengan menggunakan proyek ini, kamu memahami dan menyetujui bahwa:
+> Proyek ini dibagikan apa adanya (*as-is*) untuk keperluan eksperimen/pribadi. Dengan menggunakan proyek ini, kamu memahami dan menyetujui bahwa:
 >
 > - ✅ Segala risiko — termasuk kemungkinan **akun Roblox-mu terkena banned/suspend** — sepenuhnya menjadi **tanggung jawab pengguna sendiri**.
-> - ❌ **Kami tidak bertanggung jawab** atas kerugian apa pun (banned, hilang item, hilang data, dll.) dan **tidak bisa membantu memulihkan akun** yang terkena banned akibat penggunaan executor ini.
-> - 🛠️ Saat ini sedang dikembangkan **metode alternatif tanpa executor** (misalnya melalui plugin Studio resmi atau API resmi Roblox) agar penggunaannya lebih aman dan sesuai ToS. Namun metode tersebut **masih dalam tahap pengembangan** dan **belum tersedia**. Pantau terus repo ini untuk update-nya. 👀
+> - ❌ **Kami tidak bertanggung jawab** atas kerugian apa pun (banned, hilang item, hilang data, dll.) dan **tidak bisa membantu memulihkan akun** yang terkena banned akibat penggunaan proyek ini.
+> - 🛠️ Saat ini sedang dikembangkan **metode alternatif yang sesuai ToS** (misalnya melalui plugin Studio resmi atau API resmi Roblox) agar penggunaannya lebih aman. Namun metode tersebut **masih dalam tahap pengembangan** dan **belum tersedia**. Pantau terus repo ini untuk update-nya. 👀
 
 ---
 
@@ -63,7 +63,7 @@ Script Roblox (`Roblox_Script.lua`) dijalankan menggunakan **executor** (seperti
         │  menyimpan frame DMX per username
         │  HTTP GET /polling (atau broadcast via WebSocket)
         ▼
-🎮 Roblox_Script.lua  (dijalankan via executor di dalam game)
+🎮 Roblox_Script.lua  (dijalankan di dalam game via script runner pihak ketiga)
         │  polling ~44x/detik → antre di frame queue
         │  drain 1 frame per Heartbeat (~60fps) → smooth, anti-burst
         │  kirim data ke sistem lighting di dalam game
@@ -82,7 +82,7 @@ Polling mengambil banyak frame sekaligus dari server (batch), lalu frame-frame i
 |------|--------|--------|
 | 🖼️ `artnet2WSS.py` | Python (GUI/Tkinter) | Menerima sinyal Art-Net UDP di PC-mu, menampilkan status koneksi & nilai channel secara visual, lalu mengirim data ke `server.py` via WebSocket. |
 | 🌐 `server.py` | Python (aiohttp, async) | Server lokal yang menampung data DMX dari satu atau banyak client (`artnet2WSS.py`), menyediakan endpoint HTTP/WebSocket untuk diambil oleh script Roblox. |
-| 🎮 `Roblox_Script.lua` | Lua (Roblox executor) | Berjalan di dalam game [Clarity Over Resonance](https://www.roblox.com/games/18218605381/Clarity-Over-Resonance) — polling data dari `server.py`, lalu meneruskannya ke sistem lighting/kendaraan di dalam game sesuai username. |
+| 🎮 `Roblox_Script.lua` | Lua (Roblox) | Berjalan di dalam game [Clarity Over Resonance](https://www.roblox.com/games/18218605381/Clarity-Over-Resonance) — polling data dari `server.py`, lalu meneruskannya ke sistem lighting/kendaraan di dalam game sesuai username. |
 | 📦 `requirements.txt` | — | Daftar dependensi Python yang dibutuhkan (`aiohttp`, `websockets`). |
 | 🖱️ `1_INSTALL_DEPENDENSI.bat` | Windows Batch | Sekali klik untuk install semua library Python yang dibutuhkan (pengganti `pip install -r requirements.txt`). |
 | 🖱️ `2_JALANKAN_SERVER.bat` | Windows Batch | Sekali klik untuk menjalankan `server.py` tanpa perlu buka Command Prompt manual. |
@@ -106,7 +106,7 @@ Proyek ini dibuat **khusus** untuk satu game berikut dan tidak dijamin kompatibe
 - 💻 **OS:** Windows 10/11 (direkomendasikan), macOS, atau Linux
 - 🐍 **Python:** versi 3.11 atau lebih baru → [Download Python](https://www.python.org/downloads/)
 - 🎮 **Roblox:** terinstal dan bisa dibuka
-- 🧩 **Executor:** Executor Roblox yang mendukung fungsi `http_request` / `request` (contoh: Synapse X, KRNL, Fluxus, Delta) — lihat [⚠️ peringatan di atas](#️-peringatan-penting--baca-sebelum-mulai)
+- 🧩 **Script Runner:** Tool/plugin pihak ketiga yang mendukung fungsi `http_request` / `request` — lihat [⚠️ peringatan di atas](#️-peringatan-penting--baca-sebelum-mulai)
 - 🎚️ **Software DMX:** MA3 on PC, QLC+, MagicQ, atau software Art-Net lain yang bisa broadcast ke port `6454`
 
 ---
@@ -155,7 +155,7 @@ Untuk pengguna Windows yang tidak ingin repot mengetik perintah di Command Promp
 **Rekomendasi pemakaian tercepat:**
 1. Double-click `START_SEMUA.bat`
 2. Tunggu sampai dua jendela Command Prompt terbuka (Server + GUI Art-Net)
-3. Isi Username di jendela GUI, lalu lanjut ke [Langkah 3 — Buka Roblox & Jalankan Script Executor](#langkah-3--buka-roblox--jalankan-script-executor-) di bawah
+3. Isi Username di jendela GUI, lalu lanjut ke [Langkah 3 — Buka Roblox & Jalankan Script](#langkah-3--buka-roblox--jalankan-script-) di bawah
 
 > Semua file `.bat` otomatis mendeteksi apakah Python di sistemmu terdaftar sebagai `python` atau `py`, jadi tetap berfungsi meski cara instalasi Python-nya berbeda-beda. File `.bat` ini **hanya untuk Windows** — pengguna macOS/Linux tetap menjalankan lewat perintah `python3 server.py` dll seperti biasa.
 
@@ -213,14 +213,13 @@ Jika koneksi ke server berhasil, indikator **🟢 "WebSocket connected"** akan m
 
 > 🖱️ **Windows:** cukup double-click `3_JALANKAN_ARTNET2WSS.bat` sebagai gantinya.
 
-### Langkah 3 — Buka Roblox & Jalankan Script Executor 🎮
+### Langkah 3 — Buka Roblox & Jalankan Script 🎮
 
 1. Buka game Roblox yang mendukung fitur DMX/kendaraan (lihat [daftar game](#-game-yang-didukung))
-2. Buka executormu
-3. Copy-paste seluruh isi `Roblox_Script.lua` ke executor
-4. Klik **Execute / Inject**
+2. Buka tool/script runner yang kamu gunakan
+3. Copy-paste seluruh isi `Roblox_Script.lua`, lalu jalankan sesuai cara tool tersebut
 
-Jika berhasil, di output/console executor akan muncul:
+Jika berhasil, di output/console akan muncul:
 
 ```
 [DMX] Polling thread started → http://127.0.0.1:5311/polling
@@ -286,7 +285,7 @@ Player lain yang ingin bergabung tinggal:
 
 ## 🔄 Menghentikan Script di Roblox
 
-Untuk menghentikan script Lua tanpa keluar dari game, jalankan baris berikut di executor:
+Untuk menghentikan script Lua tanpa keluar dari game, jalankan baris berikut:
 
 ```lua
 _G.ResetSpesificScripts = true
@@ -328,8 +327,8 @@ Script akan mendeteksi flag ini pada iterasi polling berikutnya, mencetak log `[
 **🔴 `artnet2WSS.py` error `'ProactorEventLoop' object has no attribute 'sock_recvfrom'`**
 → Ini bug kompatibilitas asyncio di Windows (event loop default `ProactorEventLoop` baru mendukung `sock_recvfrom` mulai Python 3.11). Sudah diperbaiki di `artnet2WSS.py` versi ini dengan memaksa pemakaian `SelectorEventLoop` khusus di Windows. Jika masih muncul, pastikan kamu memakai file `artnet2WSS.py` versi terbaru dari repo ini.
 
-**🔴 Script executor langsung error / crash**
-→ Pastikan executormu mendukung fungsi `http_request`/`request`. Tidak semua executor gratis mendukung fitur ini — script akan menampilkan error `"Executor tidak mendukung HTTP request"` jika tidak didukung.
+**🔴 Script langsung error / crash**
+→ Pastikan tool yang kamu gunakan mendukung fungsi `http_request`/`request`. Tidak semua tool gratis mendukung fitur ini — script akan menampilkan error `"HTTP request tidak didukung"` jika tidak didukung.
 
 ---
 
