@@ -35,7 +35,7 @@ end
 -- KONFIGURASI
 -- ============================================================
 local BASE_URL      = "http://127.0.0.1:5311/polling"
-local POLL_INTERVAL = 1 / 44   -- seberapa sering tanya server
+local POLL_INTERVAL = 1 / 60   -- seberapa sering tanya server
 
 -- Batas maksimal frame yang boleh menunggu di queue per user.
 -- Jika queue penuh, frame paling lama dibuang (drop head).
