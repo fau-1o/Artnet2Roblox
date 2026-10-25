@@ -1,351 +1,224 @@
+"""
+DMX Multi-Universe Bridge - Server (release)
+
+Alur: artnet2WSS.py --(WebSocket)--> server ini --(HTTP /polling)--> script Roblox (Lua)
+
+Jalankan saja:   python Server_multi_universe_polling.py
+Default aman: hanya menerima koneksi dari PC ini (127.0.0.1).
+Kalau Art-Net client ada di PC lain di LAN:  python Server_multi_universe_polling.py --lan
+Butuh:  pip install aiohttp
+"""
+import argparse
 import asyncio
 import json
 import time
-from datetime import datetime, timezone
 from collections import deque
+from datetime import datetime, timezone
 
 from aiohttp import web
 
-# ============================================================
-# KONFIGURASI SERVER
-# ============================================================
-SERVER_HOST = "0.0.0.0"
-SERVER_PORT = 5311
+# ------------------------------------------------------------------
+# Konstanta (default sudah optimal, tidak perlu diubah)
+# ------------------------------------------------------------------
+DEFAULT_PORT = 5311
+MAX_UNIVERSES = 8            # harus sama dengan Lua & artnet2WSS.py
+MAX_USERS = 16               # batas user aktif (cegah memori membengkak)
+MAX_USERNAME_LEN = 64
+POLLING_FRAMES = 60          # frame maks yang ditahan per universe di antara dua polling
+KEEPALIVE_INTERVAL = 1.0     # state yang tidak berubah dikirim ulang tiap sekian detik
+USER_IDLE_TIMEOUT = 60.0     # buang universe yang tidak ada data selama sekian detik
+MAX_WS_MESSAGE = 256 * 1024  # 8 universe penuh masih < 40 KB
 
-# Berapa frame per polling request yang disimpan
-POLLING_FRAMES = 100
-
-# Throttle broadcast ke subscriber WebSocket (detik)
-# Contoh: 0.033 = ~30fps, 0.022 = ~44fps
-BROADCAST_INTERVAL = 0.033
-
-# Berapa detik tanpa data sampai user dianggap tidak aktif (untuk cleanup)
-USER_IDLE_TIMEOUT = 60.0
-
-# Jeda reconnect: jika jarak antar frame lebih dari ini, kosongkan ember
-RECONNECT_GAP_THRESHOLD = 0.5
-
-# ============================================================
-# STATE GLOBAL
-# ============================================================
-global_dmx_data: dict = {}
-user_buffers: dict[str, deque] = {}
-user_last_seen: dict[str, float] = {}
-subscribers: set = set()
-
-# Flag agar broadcast tidak ditrigger terlalu sering
-_broadcast_pending = False
+# Kunci = (username, universe). Tiap universe berdiri sendiri.
+universe_buffers: dict[tuple[str, int], deque] = {}
+universe_states: dict[tuple[str, int], dict[str, int]] = {}  # hanya channel > 0
+last_seen: dict[tuple[str, int], float] = {}
+last_frame: dict[tuple[str, int], float] = {}
 
 
-# ============================================================
-# HELPERS
-# ============================================================
+def log(message: str) -> None:
+    print(time.strftime("%H:%M:%S"), message, flush=True)
 
-def normalize_dmx_payload(payload: dict):
-    """
-    Parse payload masuk. Return (username, processed_data) atau (None, None).
-    processed_data TIDAK menyertakan channel bernilai 0 (efisiensi ukuran).
-    """
+
+def compact_json(obj) -> str:
+    return json.dumps(obj, separators=(",", ":"))
+
+
+def normalize_payload(payload) -> list[tuple[str, int, dict[str, int]]]:
+    """Validasi paket dari client. Channel bernilai 0 tidak disimpan (dianggap 0)."""
     if not isinstance(payload, dict):
-        return None, None
+        return []
+    username = payload.get("Username") or payload.get("username") or payload.get("name")
+    if not isinstance(username, str):
+        return []
+    username = username.strip()[:MAX_USERNAME_LEN]
+    if not username:
+        return []
 
-    username = (
-        payload.get("Username")
-        or payload.get("username")
-        or payload.get("name")
-    )
-    raw_data = (
-        payload.get("data")
-        or payload.get("dmx")
-        or payload.get("channels")
-    )
+    universes = payload.get("universes")
+    if isinstance(universes, dict):
+        items = list(universes.items())
+    else:  # format lama: satu universe
+        items = [(payload.get("universe", payload.get("Universe", 1)),
+                  payload.get("data", payload.get("dmx", payload.get("channels"))))]
 
-    if not username or not isinstance(raw_data, dict):
-        return None, None
-
-    processed_data: dict[str, int] = {}
-    for channel_str, value in raw_data.items():
+    result = []
+    for raw_universe, raw_data in items:
         try:
-            channel = int(channel_str)
-            val = int(value)
-        except (TypeError, ValueError):
+            universe = int(raw_universe)
+        except (TypeError, ValueError, OverflowError):
             continue
-
-        if 1 <= channel <= 512:
-            clamped = max(0, min(255, val))
-            if clamped > 0:  # Skip channel bernilai 0 — hemat bandwidth
-                processed_data[str(channel)] = clamped
-
-    return str(username), processed_data
-
-
-async def safe_send(websocket: web.WebSocketResponse, payload: dict) -> bool:
-    """Kirim JSON ke websocket. Return False jika gagal (koneksi mati)."""
-    try:
-        await websocket.send_str(json.dumps(payload, separators=(",", ":")))
-        return True
-    except Exception:
-        return False
+        if not 1 <= universe <= MAX_UNIVERSES or not isinstance(raw_data, dict):
+            continue
+        channels: dict[str, int] = {}
+        for raw_channel, raw_value in raw_data.items():
+            try:
+                ch = int(raw_channel)
+                value = int(raw_value)
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if 1 <= ch <= 512 and value > 0:
+                channels[str(ch)] = min(255, value)
+        result.append((username, universe, channels))
+    return result
 
 
-# ============================================================
-# BROADCAST THROTTLED
-# ============================================================
-
-async def schedule_broadcast():
-    """
-    Jadwalkan satu broadcast ke semua subscriber.
-    Jika sudah ada broadcast pending, skip — tidak perlu double trigger.
-    Ini mencegah spam broadcast kalau data Art-Net masuk 40+ frame/detik.
-    """
-    global _broadcast_pending
-    if _broadcast_pending:
-        return
-    _broadcast_pending = True
-    await asyncio.sleep(BROADCAST_INTERVAL)
-    _broadcast_pending = False
-    await broadcast_state()
-
-
-async def broadcast_state():
-    """Kirim state terkini ke semua subscriber aktif."""
-    if not subscribers:
-        return
-
-    message = json.dumps(
-        {
-            "type": "state",
-            "generatedAt": datetime.now(timezone.utc).isoformat(),
-            "data": global_dmx_data,
-        },
-        separators=(",", ":"),
-    )
-
-    stale: list[web.WebSocketResponse] = []
-    for ws in list(subscribers):
-        try:
-            await ws.send_str(message)
-        except Exception:
-            stale.append(ws)
-
-    for ws in stale:
-        subscribers.discard(ws)
-
-
-# ============================================================
-# CLEANUP IDLE USERS
-# ============================================================
-
-async def cleanup_idle_users():
-    """
-    Background task: hapus user_buffers dan global_dmx_data untuk user
-    yang sudah lama tidak mengirim data.
-    Mencegah memory leak jika banyak client sementara masuk lalu pergi.
-    """
-    while True:
-        await asyncio.sleep(30)  # Cek tiap 30 detik
-        now = time.time()
-        idle_users = [
-            username
-            for username, last_seen in list(user_last_seen.items())
-            if now - last_seen > USER_IDLE_TIMEOUT
-        ]
-        for username in idle_users:
-            user_buffers.pop(username, None)
-            global_dmx_data.pop(username, None)
-            user_last_seen.pop(username, None)
-
-        if idle_users:
-            print(f"[Cleanup] Removed {len(idle_users)} idle user(s): {idle_users}")
-
-
-# ============================================================
-# MESSAGE PROCESSING
-# ============================================================
-
-async def process_ws_message(websocket: web.WebSocketResponse, raw_message: str) -> bool:
-    """
-    Proses satu pesan WebSocket.
-    Return True  → websocket ini adalah subscriber (bukan pengirim data).
-    Return False → data DMX diproses, atau ada error.
-    """
-    try:
-        payload = json.loads(raw_message)
-    except json.JSONDecodeError:
-        await safe_send(websocket, {"type": "error", "message": "Data bukan JSON yang valid."})
-        return False
-
-    if not isinstance(payload, dict):
-        await safe_send(websocket, {"type": "error", "message": "Payload harus berupa objek JSON."})
-        return False
-
-    # --- Subscribe request ---
-    if payload.get("type") == "subscribe":
-        subscribers.add(websocket)
-        await safe_send(
-            websocket,
-            {"type": "subscribed", "data": global_dmx_data},
-        )
-        return True  # Tandai sebagai subscriber
-
-    # --- DMX data ---
-    username, processed_data = normalize_dmx_payload(payload)
-    if username is None:
-        await safe_send(websocket, {"type": "error", "message": "Payload DMX tidak valid."})
-        return False
-
-    # Update waktu terakhir aktif
+def ingest(items) -> None:
     now = time.time()
-    user_last_seen[username] = now
-
-    # --- RECONNECT GUARD ---
-    # Jika ada jeda panjang sejak frame terakhir (klien baru reconnect atau
-    # lama idle), kosongkan ember agar tidak ada frame lama yang ikut terkirim.
-    if username in user_buffers and len(user_buffers[username]) > 0:
-        last_frame_time = user_buffers[username][-1]["timestamp"]
-        if now - last_frame_time > RECONNECT_GAP_THRESHOLD:
-            user_buffers[username].clear()
-    # ----------------------
-
-    # Buat ember jika user baru
-    if username not in user_buffers:
-        user_buffers[username] = deque(maxlen=POLLING_FRAMES)
-
-    # Simpan ke global state dan ember
-    global_dmx_data[username] = processed_data
-    user_buffers[username].append(
-        {
-            "timestamp": now,
-            "channels": processed_data,
-        }
-    )
-
-    # Jadwalkan broadcast (throttled, tidak langsung)
-    asyncio.create_task(schedule_broadcast())
-
-    return False
+    for username, universe, channels in items:
+        key = (username, universe)
+        if key not in universe_states:
+            active_users = {u for u, _ in universe_states}
+            if username not in active_users and len(active_users) >= MAX_USERS:
+                continue  # terlalu banyak user, abaikan yang baru
+        last_seen[key] = now
+        if universe_states.get(key) == channels:
+            continue  # tidak berubah: tidak perlu frame baru (keepalive akan mengulang)
+        universe_states[key] = channels
+        last_frame[key] = now
+        q = universe_buffers.setdefault(key, deque(maxlen=POLLING_FRAMES))
+        q.append({"timestamp": now, "channels": channels})
 
 
-# ============================================================
-# WEBSOCKET HANDLER
-# ============================================================
+async def safe_send(ws: web.WebSocketResponse, data) -> None:
+    try:
+        await ws.send_str(compact_json(data))
+    except Exception:
+        pass
 
-async def websocket_handler(request: web.Request):
-    """Tangani koneksi WebSocket atau HTTP GET biasa di path yang sama."""
-    ws = web.WebSocketResponse(heartbeat=30)
-    ready = ws.can_prepare(request)
 
-    if not ready.ok:
-        # Bukan WebSocket upgrade — kirim info endpoint saja
-        return web.json_response(
-            {
-                "message": "Art-Net bridge ready.",
-                "websocket": {"primary": "/", "alternate": "/ws"},
-                "http": {"state": "/state", "polling": "/polling"},
-            }
-        )
-
+async def websocket_handler(request: web.Request) -> web.StreamResponse:
+    # compress=False: tanpa kompresi supaya latensi minimum di jaringan lokal
+    ws = web.WebSocketResponse(heartbeat=30, max_msg_size=MAX_WS_MESSAGE, compress=False)
+    if not ws.can_prepare(request).ok:
+        return web.json_response({
+            "message": "DMX multi-universe bridge ready",
+            "websocket": "/ws",
+            "http": {"polling": "/polling", "state": "/state"},
+            "max_universes": MAX_UNIVERSES,
+        })
     await ws.prepare(request)
-    is_subscriber = False
-
-    await safe_send(ws, {"type": "hello", "message": "Art-Net bridge ready."})
-
+    log(f"Client terhubung: {request.remote}")
+    await safe_send(ws, {"type": "hello", "message": "DMX multi-universe bridge ready"})
     try:
         async for message in ws:
-            if message.type == web.WSMsgType.TEXT:
-                is_sub = await process_ws_message(ws, message.data)
-                if is_sub:
-                    is_subscriber = True
-            elif message.type in (web.WSMsgType.ERROR, web.WSMsgType.CLOSE):
-                break
+            if message.type != web.WSMsgType.TEXT:
+                continue
+            try:
+                payload = json.loads(message.data)
+            except json.JSONDecodeError:
+                await safe_send(ws, {"type": "error", "message": "Invalid JSON"})
+                continue
+            items = normalize_payload(payload)
+            if not items:
+                await safe_send(ws, {"type": "error",
+                                     "message": f"Expected Username and universes 1..{MAX_UNIVERSES}"})
+                continue
+            ingest(items)
     finally:
-        if is_subscriber:
-            subscribers.discard(ws)
-
+        log(f"Client terputus: {request.remote}")
     return ws
 
 
-# ============================================================
-# HTTP ENDPOINTS
-# ============================================================
+async def get_polling_data(_request: web.Request) -> web.Response:
+    """Ambil semua frame baru lalu kosongkan antrean (satu poller saja)."""
+    response_data: dict[str, dict[str, dict]] = {}
+    for (username, universe), q in list(universe_buffers.items()):
+        if not q:
+            continue
+        frames = list(q)
+        q.clear()
+        response_data.setdefault(username, {})[str(universe)] = {
+            f"t{i + 1}": frame for i, frame in enumerate(frames)
+        }
+    return web.json_response(
+        {"generatedAt": datetime.now(timezone.utc).isoformat(), "data": response_data},
+        headers={"Cache-Control": "no-store"},
+        dumps=compact_json,
+    )
+
 
 async def get_state(_request: web.Request) -> web.Response:
-    """HTTP GET /state — snapshot terkini, satu frame per user."""
+    data: dict[str, dict[str, dict]] = {}
+    for (username, universe), channels in universe_states.items():
+        data.setdefault(username, {})[str(universe)] = channels
     return web.json_response(
-        {
-            "generatedAt": datetime.now(timezone.utc).isoformat(),
-            "data": global_dmx_data,
-        },
+        {"generatedAt": datetime.now(timezone.utc).isoformat(), "data": data},
         headers={"Cache-Control": "no-store"},
+        dumps=compact_json,
     )
 
 
-async def get_polling_data(_request: web.Request) -> web.Response:
-    """
-    HTTP GET /polling — ambil semua frame terakumulasi per user,
-    format ke t1, t2, ..., tN, lalu kosongkan ember.
-    """
-    response_data: dict = {}
-
-    for username, buffer in list(user_buffers.items()):
-        if not buffer:
-            continue
-
-        frames_list = list(buffer)
-        buffer.clear()  # Kosongkan setelah diambil
-
-        response_data[username] = {
-            f"t{i + 1}": frame for i, frame in enumerate(frames_list)
-        }
-
-    return web.json_response(
-        {
-            "generatedAt": datetime.now(timezone.utc).isoformat(),
-            "data": response_data,
-        },
-        headers={"Cache-Control": "no-store"},
-    )
+async def maintenance_loop() -> None:
+    """Keepalive state yang diam + buang universe yang sudah tidak aktif."""
+    while True:
+        await asyncio.sleep(0.25)
+        now = time.time()
+        for key, channels in list(universe_states.items()):
+            seen = last_seen.get(key, 0.0)
+            if now - seen > USER_IDLE_TIMEOUT:
+                for table in (universe_states, universe_buffers, last_seen, last_frame):
+                    table.pop(key, None)
+                continue
+            if now - last_frame.get(key, 0.0) >= KEEPALIVE_INTERVAL:
+                last_frame[key] = now
+                q = universe_buffers.setdefault(key, deque(maxlen=POLLING_FRAMES))
+                q.append({"timestamp": now, "channels": channels})
 
 
-# ============================================================
-# APP SETUP
-# ============================================================
-
-def create_app() -> web.Application:
+async def main(host: str, port: int) -> None:
     app = web.Application()
     app.router.add_get("/", websocket_handler)
     app.router.add_get("/ws", websocket_handler)
-    app.router.add_get("/state", get_state)
     app.router.add_get("/polling", get_polling_data)
-    return app
-
-
-async def main():
-    app = create_app()
+    app.router.add_get("/state", get_state)
     runner = web.AppRunner(app)
     await runner.setup()
-
-    site = web.TCPSite(runner, SERVER_HOST, SERVER_PORT)
-    await site.start()
-
-    # Jalankan background cleanup task
-    asyncio.create_task(cleanup_idle_users())
-
-    print("=" * 50)
-    print("Art-Net Bridge Server — READY")
-    print(f"  WebSocket      : ws://0.0.0.0:{SERVER_PORT}/")
-    print(f"  WebSocket alt  : ws://0.0.0.0:{SERVER_PORT}/ws")
-    print(f"  HTTP state     : http://0.0.0.0:{SERVER_PORT}/state")
-    print(f"  HTTP polling   : http://0.0.0.0:{SERVER_PORT}/polling")
-    print(f"  Broadcast rate : ~{1/BROADCAST_INTERVAL:.0f} fps (throttled)")
-    print(f"  Idle cleanup   : after {USER_IDLE_TIMEOUT:.0f}s")
-    print("=" * 50)
-
     try:
-        await asyncio.Future()  # Block selamanya
+        await web.TCPSite(runner, host, port, reuse_address=True).start()
+    except OSError as exc:
+        log(f"GAGAL membuka {host}:{port} -> {exc}")
+        log("Port sedang dipakai? Tutup server lama atau jalankan dengan --port <angka lain>.")
+        await runner.cleanup()
+        return
+    task = asyncio.create_task(maintenance_loop())
+    scope = "semua perangkat di LAN" if host == "0.0.0.0" else "hanya PC ini"
+    log(f"DMX Multi-Universe Server READY | port {port} | universe 1-{MAX_UNIVERSES} | akses: {scope}")
+    log("Tekan Ctrl+C untuk berhenti.")
+    try:
+        await asyncio.Event().wait()
     finally:
+        task.cancel()
         await runner.cleanup()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description="DMX Multi-Universe Bridge Server")
+    parser.add_argument("--lan", action="store_true",
+                        help="izinkan koneksi dari PC lain di LAN (default: hanya 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    args = parser.parse_args()
+    try:
+        asyncio.run(main("0.0.0.0" if args.lan else "127.0.0.1", args.port))
+    except KeyboardInterrupt:
+        log("Server dihentikan.")
